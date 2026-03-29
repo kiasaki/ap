@@ -46,7 +46,7 @@ func NewCtx[TApp any, TUser any](framework *App[TApp, TUser], app TApp, req *htt
 	for k := range c.Req.Form {
 		c.Params[k] = c.Req.Form.Get(k)
 	}
-	c.Params["id"] = or(c.Params["id"], c.Req.PathValue("id"))
+	c.Params["id"] = Or(c.Params["id"], c.Req.PathValue("id"))
 	return c, nil
 }
 
@@ -67,7 +67,7 @@ func (c *Ctx[TApp, TUser]) Path() string {
 }
 
 func (c *Ctx[TApp, TUser]) Param(key, alt string) string {
-	return or(c.Params[key], alt)
+	return Or(c.Params[key], alt)
 }
 
 func (c *Ctx[TApp, TUser]) Header(key, value string) {
