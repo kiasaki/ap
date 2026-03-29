@@ -11,71 +11,90 @@ import (
 	"time"
 )
 
-type Handler[TApp any, TUser any] func(*Ctx[TApp, TUser])
+type Handler[TApp any] func(*Ctx[TApp])
 
-type PanicHandler[TApp any, TUser any] func(*Ctx[TApp, TUser], interface{})
-type WrapFunc[TApp any, TUser any] func(*Ctx[TApp, TUser])
-type CurrentUserFunc[TApp any, TUser any] func(*Ctx[TApp, TUser]) TUser
-type FuncsFunc[TApp any, TUser any] func(*Ctx[TApp, TUser]) template.FuncMap
+type PanicHandler[TApp any] func(*Ctx[TApp], interface{})
+type WrapFunc[TApp any] func(*Ctx[TApp])
+type FuncsFunc[TApp any] func(*Ctx[TApp]) template.FuncMap
 
-type App[TApp any, TUser any] struct {
+type App[TApp any] struct {
 	mux          *http.ServeMux
 	template     *template.Template
-	wrap         WrapFunc[TApp, TUser]
-	panicHandler PanicHandler[TApp, TUser]
-	currentUser  CurrentUserFunc[TApp, TUser]
-	funcs        FuncsFunc[TApp, TUser]
+	wrap         WrapFunc[TApp]
+	panicHandler PanicHandler[TApp]
+	funcs        []FuncsFunc[TApp]
 }
 
-func New[TApp any, TUser any]() *App[TApp, TUser] {
-	return &App[TApp, TUser]{mux: &http.ServeMux{}}
+func New[TApp any]() *App[TApp] {
+	return &App[TApp]{mux: &http.ServeMux{}}
 }
 
-func (a *App[TApp, TUser]) Mux() *http.ServeMux {
+func (a *App[TApp]) Mux() *http.ServeMux {
 	return a.mux
 }
 
-func (a *App[TApp, TUser]) Handle(pattern string, app TApp, handler Handler[TApp, TUser]) {
+func (a *App[TApp]) Handle(pattern string, app TApp, handler Handler[TApp]) {
 	a.mux.Handle(pattern, a.wrapHandler(app, handler))
 }
 
-func (a *App[TApp, TUser]) HandleHTTP(pattern string, handler http.Handler) {
+func (a *App[TApp]) HandleHTTP(pattern string, handler http.Handler) {
 	a.mux.Handle(pattern, handler)
 }
 
-func (a *App[TApp, TUser]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (a *App[TApp]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	a.mux.ServeHTTP(w, r)
 }
 
-func (a *App[TApp, TUser]) Template() *template.Template {
+func (a *App[TApp]) Template() *template.Template {
 	return a.template
 }
 
-func (a *App[TApp, TUser]) SetTemplate(t *template.Template) {
+func (a *App[TApp]) SetTemplate(t *template.Template) {
 	a.template = t
 }
 
-func (a *App[TApp, TUser]) SetWrap(fn WrapFunc[TApp, TUser]) {
+func (a *App[TApp]) SetWrap(fn WrapFunc[TApp]) {
 	a.wrap = fn
 }
 
-func (a *App[TApp, TUser]) SetPanicHandler(fn PanicHandler[TApp, TUser]) {
+func (a *App[TApp]) SetPanicHandler(fn PanicHandler[TApp]) {
 	a.panicHandler = fn
 }
 
-func (a *App[TApp, TUser]) SetCurrentUser(fn CurrentUserFunc[TApp, TUser]) {
-	a.currentUser = fn
+func (a *App[TApp]) AddFuncs(fn FuncsFunc[TApp]) {
+	a.funcs = append(a.funcs, fn)
 }
 
-func (a *App[TApp, TUser]) SetFuncs(fn FuncsFunc[TApp, TUser]) {
-	a.funcs = fn
+func (a *App[TApp]) SetFuncs(fn FuncsFunc[TApp]) {
+	if fn == nil {
+		a.funcs = nil
+		return
+	}
+	a.funcs = []FuncsFunc[TApp]{fn}
 }
 
-func (a *App[TApp, TUser]) ListenAndServe(addr string) error {
+func (a *App[TApp]) Funcs(c *Ctx[TApp]) template.FuncMap {
+	funcs := template.FuncMap{}
+	for _, fn := range a.funcs {
+		if fn == nil {
+			continue
+		}
+		for key, value := range fn(c) {
+			funcs[key] = value
+		}
+	}
+	return funcs
+}
+
+func (a *App[TApp]) TemplateFuncs() template.FuncMap {
+	return a.Funcs(nil)
+}
+
+func (a *App[TApp]) ListenAndServe(addr string) error {
 	return http.ListenAndServe(addr, a)
 }
 
-func (a *App[TApp, TUser]) wrapHandler(app TApp, h Handler[TApp, TUser]) http.HandlerFunc {
+func (a *App[TApp]) wrapHandler(app TApp, h Handler[TApp]) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx, err := NewCtx(a, app, r, w)
 		if err != nil {
@@ -118,8 +137,4 @@ func PrettyStack() string {
 		out += strings.Split(stackLines[i], "0x")[0] + ")\n"
 	}
 	return out
-}
-
-func Funcs(c *Ctx[any, any]) template.FuncMap {
-	return template.FuncMap{}
 }
