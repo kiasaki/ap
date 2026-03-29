@@ -18,6 +18,7 @@ type WrapFunc[TApp any] func(*Ctx[TApp])
 type FuncsFunc[TApp any] func(*Ctx[TApp]) template.FuncMap
 
 type App[TApp any] struct {
+	app          TApp
 	mux          *http.ServeMux
 	template     *template.Template
 	wrap         WrapFunc[TApp]
@@ -25,16 +26,16 @@ type App[TApp any] struct {
 	funcs        []FuncsFunc[TApp]
 }
 
-func New[TApp any]() *App[TApp] {
-	return &App[TApp]{mux: &http.ServeMux{}}
+func New[TApp any](app TApp) *App[TApp] {
+	return &App[TApp]{app: app, mux: &http.ServeMux{}}
 }
 
 func (a *App[TApp]) Mux() *http.ServeMux {
 	return a.mux
 }
 
-func (a *App[TApp]) Handle(pattern string, app TApp, handler Handler[TApp]) {
-	a.mux.Handle(pattern, a.wrapHandler(app, handler))
+func (a *App[TApp]) Handle(pattern string, handler Handler[TApp]) {
+	a.mux.Handle(pattern, a.wrapHandler(handler))
 }
 
 func (a *App[TApp]) HandleHTTP(pattern string, handler http.Handler) {
@@ -94,9 +95,9 @@ func (a *App[TApp]) ListenAndServe(addr string) error {
 	return http.ListenAndServe(addr, a)
 }
 
-func (a *App[TApp]) wrapHandler(app TApp, h Handler[TApp]) http.HandlerFunc {
+func (a *App[TApp]) wrapHandler(h Handler[TApp]) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ctx, err := NewCtx(a, app, r, w)
+		ctx, err := NewCtx(a, r, w)
 		if err != nil {
 			panic(err)
 		}

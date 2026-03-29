@@ -23,8 +23,8 @@ type Ctx[TApp any] struct {
 	web      *App[TApp]
 }
 
-func NewCtx[TApp any](web *App[TApp], app TApp, req *http.Request, res http.ResponseWriter) (*Ctx[TApp], error) {
-	c := &Ctx[TApp]{App: app, Req: req, Res: res, web: web}
+func NewCtx[TApp any](web *App[TApp], req *http.Request, res http.ResponseWriter) (*Ctx[TApp], error) {
+	c := &Ctx[TApp]{App: web.app, Req: req, Res: res, web: web}
 	c.Status = 200
 	c.Params = map[string]string{}
 	c.Values = map[string]interface{}{}

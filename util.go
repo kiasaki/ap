@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"math"
 	"net/http"
 	"os"
 	"strconv"
@@ -116,30 +115,6 @@ func MarkdownToHTML(text string) string {
 	return md.RenderToString([]byte(text))
 }
 
-func FloatInOptions(value float64, options []float64) bool {
-	const epsilon = 0.0001
-	for _, option := range options {
-		fmt.Println("floatInOptions", math.Abs(option-value), value, option, options)
-		if math.Abs(option-value) < epsilon {
-			return true
-		}
-	}
-	return false
-}
-
-type StringOption interface {
-	GetID() string
-}
-
-func StringInOptions[T StringOption](value string, options []T) bool {
-	for _, option := range options {
-		if option.GetID() == value {
-			return true
-		}
-	}
-	return false
-}
-
 func Truncate(text string, length int) string {
 	if len(text) > length {
 		return text[:length-1] + "…"
@@ -171,29 +146,6 @@ func FormatDatetime(t time.Time) string {
 		loc = time.Local
 	}
 	return t.In(loc).Format("Jan 2, 15:04")
-}
-
-func QuoteTranscriptValue(s string) string {
-	if s == "" {
-		return "\"\""
-	}
-	if !strings.ContainsAny(s, " \t\n\r") {
-		return s
-	}
-	return strconv.Quote(s)
-}
-
-func ToolInputText(v string) (r string) {
-	defer func() {
-		if err := recover(); err != nil {
-			r = v
-		}
-	}()
-	j := StringToJSON(v)
-	if l, ok := j["todos"]; ok {
-		return strconv.Itoa(len(l.([]interface{})))
-	}
-	return Or(Or(Or(j.Get("path"), j.Get("command")), j.Get("query")), v)
 }
 
 func HTTPGet(v interface{}, url string, headers map[string]string) error {
