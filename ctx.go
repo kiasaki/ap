@@ -9,15 +9,13 @@ import (
 	"net/http"
 )
 
-type Values = map[string]interface{}
-
 type Ctx[TApp any] struct {
 	App      TApp
 	Req      *http.Request
 	Res      http.ResponseWriter
 	Status   int
 	Params   map[string]string
-	Values   map[string]interface{}
+	Values   J
 	Done     bool
 	template *template.Template
 	web      *App[TApp]
@@ -105,9 +103,9 @@ func (c *Ctx[TApp]) Text(text string) {
 	c.Done = true
 }
 
-func (c *Ctx[TApp]) Render(name string, values Values) {
+func (c *Ctx[TApp]) Render(name string, values J) {
 	if values == nil {
-		values = Values{}
+		values = J{}
 	}
 	for k, v := range c.Values {
 		if _, ok := values[k]; !ok {
