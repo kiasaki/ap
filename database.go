@@ -54,6 +54,9 @@ func (db *Database) Save(e interface{}) error {
 		return fmt.Errorf("Database.Save expects a pointer to struct")
 	}
 	tableName := ToSnakeCase(value.Type().Elem().Name()) + "s"
+	if strings.HasSuffix(tableName, "ys") {
+		tableName = tableName[:len(tableName)-2] + "ies"
+	}
 
 	fields := []string{}
 	placeholders := []string{}
