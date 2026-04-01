@@ -34,12 +34,17 @@ func (s *SandboxDocker) Setup(id string, forgeRepo string, forgeToken string) er
 	if out, err := exec.Command("docker", "exec", name, "sh", "-c", "command -v git || (apt-get update -qq && apt-get install -y -qq git)").CombinedOutput(); err != nil {
 		return fmt.Errorf("docker exec git install: %w: %s", err, bytes.TrimSpace(out))
 	}
-	authURL := strings.TrimSpace(forgeRepo)
-	if rest, ok := strings.CutPrefix(authURL, "https://"); ok {
-		authURL = "https://x-access-token:" + forgeToken + "@" + rest
+	host := forgeHost(forgeRepo)
+	cmd := exec.Command("docker", "exec", "-i", name, "sh", "-c", "cat > /root/.netrc")
+	cmd.Stdin = strings.NewReader(fmt.Sprintf("machine %s login x-access-token password %s\n", host, forgeToken))
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("docker exec netrc: %w: %s", err, bytes.TrimSpace(out))
 	}
-	if out, err := exec.Command("docker", "exec", name, "git", "clone", authURL, "/work").CombinedOutput(); err != nil {
-		return fmt.Errorf("docker exec git clone: %w: %s", err, bytes.TrimSpace(out))
+	if out, err := exec.Command("docker", "exec", name, "chmod", "600", "/root/.netrc").CombinedOutput(); err != nil {
+		return fmt.Errorf("docker exec chmod: %w: %s", err, bytes.TrimSpace(out))
+	}
+	if _, err := exec.Command("docker", "exec", name, "git", "clone", strings.TrimSpace(forgeRepo), "/work").CombinedOutput(); err != nil {
+		return fmt.Errorf("docker exec git clone: %w", err)
 	}
 	return nil
 }
@@ -85,4 +90,16 @@ func (s *SandboxDocker) URL(id string, port int) (string, error) {
 
 func containerName(id string) string {
 	return "sandbox-" + id
+}
+
+func forgeHost(forgeRepo string) string {
+	forgeRepo = strings.TrimSpace(forgeRepo)
+	for _, prefix := range []string{"https://", "http://"} {
+		if rest, ok := strings.CutPrefix(forgeRepo, prefix); ok {
+			forgeRepo = rest
+			break
+		}
+	}
+	host, _, _ := strings.Cut(forgeRepo, "/")
+	return host
 }
