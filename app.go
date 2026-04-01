@@ -3,6 +3,7 @@ package ap
 import (
 	"fmt"
 	"html/template"
+	"io/fs"
 	"log"
 	"net/http"
 	"regexp"
@@ -27,7 +28,13 @@ type App[TApp any] struct {
 }
 
 func New[TApp any](app TApp) *App[TApp] {
-	return &App[TApp]{app: app, mux: &http.ServeMux{}}
+	a := &App[TApp]{app: app, mux: &http.ServeMux{}}
+	a.panicHandler = a.defaultPanicHandler
+	return a
+}
+
+func (a *App[TApp]) defaultPanicHandler(c *Ctx[TApp], err interface{}) {
+	c.Render("error", map[string]interface{}{"error": err})
 }
 
 func (a *App[TApp]) Mux() *http.ServeMux {
@@ -42,12 +49,22 @@ func (a *App[TApp]) HandleHTTP(pattern string, handler http.Handler) {
 	a.mux.Handle(pattern, handler)
 }
 
+func (a *App[TApp]) HandleAssets(assetsFS http.FileSystem) {
+	a.mux.Handle("/assets/", http.FileServer(assetsFS))
+}
+
 func (a *App[TApp]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	a.mux.ServeHTTP(w, r)
 }
 
 func (a *App[TApp]) Template() *template.Template {
 	return a.template
+}
+
+func (a *App[TApp]) LoadTemplates(fs fs.FS) {
+	t, err := template.New("").Funcs(a.Funcs(nil)).ParseFS(fs, "templates/*.html")
+	Check(err)
+	a.template = t
 }
 
 func (a *App[TApp]) SetTemplate(t *template.Template) {

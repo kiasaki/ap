@@ -14,34 +14,19 @@ import (
 )
 
 type Database struct {
-	url   string
 	debug bool
 	conn  *sqlx.DB
 }
 
-func NewDatabase() *Database {
-	return &Database{}
-}
-
-func (db *Database) SetURL(url string) {
-	db.url = url
-}
-
-func (db *Database) SetDebug(debug bool) {
-	db.debug = debug
-}
-
-func (db *Database) Connect() error {
-	sourceName, err := pq.ParseURL(db.url)
-	if err != nil {
-		panic(fmt.Sprintf("database postgres: %v", err))
-	}
-	db.conn, err = sqlx.Connect("postgres", sourceName)
-	if err != nil {
-		return err
-	}
-	db.conn = db.conn.Unsafe()
-	return nil
+func NewDatabase(url string) *Database {
+	d := &Database{}
+	d.debug = Env("DEBUG", "") != "0"
+	sourceName, err := pq.ParseURL(url)
+	Check(err)
+	d.conn, err = sqlx.Connect("postgres", sourceName)
+	Check(err)
+	d.conn = d.conn.Unsafe()
+	return d
 }
 
 func (db *Database) Save(e interface{}) error {
